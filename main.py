@@ -35,15 +35,13 @@ We need a couple different nodes:
 - cam_rgb is a dai.node.ColorCamera
 - mobilenet is a dai.node.MobileNetDetectionNetwork
 - crop_manip is an dai.node.ImageManip
-- videoEnc is a dai.node.VideoEncoder
 - script is a dai.node.Script
 
 - uvc is a pipeline.createUVC() ... which is different syntax?
 
-The layout of these pipelines is 
+The layout of these pipelines is like this:
 cam_rgb -> preview[300,300] -> mobilenet -> script -> crop_manip
-|-> crop_manip -> videoEnc -> uvc
-
+|-> crop_manip -> uvc
 
 """
 
@@ -132,17 +130,10 @@ crop_manip.initialConfig.setFrameType(dai.RawImgFrame.Type.NV12) # MJPEG output 
 script.outputs['cfg'].link(crop_manip.inputConfig)
 cam_rgb.isp.link(crop_manip.inputImage)
 
-# I haven't figured out how to link up the outpit from the cropping to UVC
-# I assume if I use an encoder block to make NV12, then UVC will be happy?
-# This is certainly not working
-videoEnc = pipeline.create(dai.node.VideoEncoder)
-videoEnc.setDefaultProfilePreset(30, dai.VideoEncoderProperties.Profile.MJPEG)
-crop_manip.out.link(videoEnc.input)
-
-
 # Create an UVC (USB Video Class) output node. It needs 1920x1080, NV12 input
 uvc = pipeline.create(dai.node.UVC)
-videoEnc.bitstream.link(uvc.input)
+#videoEnc.bitstream.link(uvc.input)
+crop_manip.out.link(uvc.input)
 
 # Terminate app handler
 quitEvent = threading.Event()
