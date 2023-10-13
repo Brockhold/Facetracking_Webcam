@@ -64,41 +64,13 @@ mobilenet.setBlobPath(blobconverter.from_zoo(
 mobilenet.setConfidenceThreshold(0.7)
 cam_rgb.preview.link(mobilenet.input)
 
-# bogus definitions so that pylance shuts up
-
-
-def ImageManipConfig():
-    return 1
-
-
-def Size2f():
-    return 1
-
-
-class node:
-    def io():
-        return 1
-
-
-class ImgFrame:
-    def Type():
-        return 1
-
-
-def RotatedRect():
-    return 1
-
-
-def Point2f():
-    return 1
-
-# This code is never used by the host, it is uploaded to a script node on the device
-# Slight shennanigans are used to make this editable with all the nicities of a normal IDE, but it's uploaded as a raw string
-
 
 def onboardScripting():
+    # This code is never used by the host, it is uploaded to a script node on the device
+    # Slight shennanigans are used to make this editable with all the nicities of a normal IDE, but it's uploaded as a raw string
     ORIGINAL_SIZE = (3840, 2160)  # 4K
     SCENE_SIZE = (1920, 1080)  # 1080P
+
     x_arr = []
     y_arr = []
     AVG_MAX_NUM = 7
@@ -106,8 +78,8 @@ def onboardScripting():
     limits.append(ORIGINAL_SIZE[0] - limits[0])  # xmax limit
     limits.append(ORIGINAL_SIZE[1] - limits[1])  # ymax limit
 
-    cfg = ImageManipConfig()
-    size = Size2f(SCENE_SIZE[0], SCENE_SIZE[1])
+    cfg = ImageManipConfig()  # type: ignore
+    size = Size2f(SCENE_SIZE[0], SCENE_SIZE[1])  # type: ignore
 
     def average_filter(x, y):
         x_arr.append(x)
@@ -134,7 +106,7 @@ def onboardScripting():
         return x_avg, y_avg
 
     while True:
-        dets = node.io['dets'].get().detections
+        dets = node.io['dets'].get().detections  # type: ignore
         if len(dets) == 0:
             continue
 
@@ -145,13 +117,13 @@ def onboardScripting():
 
         x_avg, y_avg = average_filter(x, y)
 
-        rect = RotatedRect()
+        rect = RotatedRect()  # type: ignore
         rect.size = size
-        rect.center = Point2f(x_avg, y_avg)
+        rect.center = Point2f(x_avg, y_avg)  # type: ignore
         cfg.setCropRotatedRect(rect, False)
         # MJPEG output for UVC consumption
-        cfg.setFrameType(ImgFrame.Type.NV12)
-        node.io['cfg'].send(cfg)
+        cfg.setFrameType(ImgFrame.Type.NV12)  # type: ignore
+        node.io['cfg'].send(cfg)  # type: ignore
 
 
 # I am 100% sure this is a gross way to do it, but this does work!
