@@ -10,11 +10,9 @@ try:
     import signal
     import threading
     from depthai_sdk.managers import arg_manager
-    import cv2
     import blobconverter
 except ImportError as e:
-    print(e,
-"""
+    print(e, f"""
 did you remember to source (or create) a venv with the dependencies?
 e.g.
 source depthai_venv/bin/activate.fish
@@ -64,37 +62,52 @@ cam_rgb.setInterleaved(False)
 
 # Create MobileNet detection network
 mobilenet = pipeline.create(dai.node.MobileNetDetectionNetwork)
-mobilenet.setBlobPath(blobconverter.from_zoo(name="face-detection-retail-0004", shaves=5))
+mobilenet.setBlobPath(blobconverter.from_zoo(
+    name="face-detection-retail-0004", shaves=5))
 mobilenet.setConfidenceThreshold(0.7)
 cam_rgb.preview.link(mobilenet.input)
 
 # bogus definitions so that pylance shuts up
+
+
 def ImageManipConfig():
     return 1
+
+
 def Size2f():
     return 1
+
+
 class node:
     def io():
         return 1
+
+
 class ImgFrame:
     def Type():
         return 1
+
+
 def RotatedRect():
     return 1
+
+
 def Point2f():
     return 1
 
 # This code is never used by the host, it is uploaded to a script node on the device
 # Slight shennanigans are used to make this editable with all the nicities of a normal IDE, but it's uploaded as a raw string
+
+
 def onboardScripting():
-    ORIGINAL_SIZE = (3840, 2160) # 4K
-    SCENE_SIZE = (1920, 1080) # 1080P
+    ORIGINAL_SIZE = (3840, 2160)  # 4K
+    SCENE_SIZE = (1920, 1080)  # 1080P
     x_arr = []
     y_arr = []
-    AVG_MAX_NUM=7
-    limits = [SCENE_SIZE[0] // 2, SCENE_SIZE[1] // 2] # xmin and ymin limits
-    limits.append(ORIGINAL_SIZE[0] - limits[0]) # xmax limit
-    limits.append(ORIGINAL_SIZE[1] - limits[1]) # ymax limit
+    AVG_MAX_NUM = 7
+    limits = [SCENE_SIZE[0] // 2, SCENE_SIZE[1] // 2]  # xmin and ymin limits
+    limits.append(ORIGINAL_SIZE[0] - limits[0])  # xmax limit
+    limits.append(ORIGINAL_SIZE[1] - limits[1])  # ymax limit
 
     cfg = ImageManipConfig()
     size = Size2f(SCENE_SIZE[0], SCENE_SIZE[1])
@@ -102,8 +115,10 @@ def onboardScripting():
     def average_filter(x, y):
         x_arr.append(x)
         y_arr.append(y)
-        if AVG_MAX_NUM < len(x_arr): x_arr.pop(0)
-        if AVG_MAX_NUM < len(y_arr): y_arr.pop(0)
+        if AVG_MAX_NUM < len(x_arr):
+            x_arr.pop(0)
+        if AVG_MAX_NUM < len(y_arr):
+            y_arr.pop(0)
         x_avg = 0
         y_avg = 0
         for i in range(len(x_arr)):
@@ -111,36 +126,45 @@ def onboardScripting():
             y_avg += y_arr[i]
         x_avg = x_avg / len(x_arr)
         y_avg = y_avg / len(y_arr)
-        if x_avg < limits[0]: x_avg = limits[0]
-        if y_avg < limits[1]: y_avg = limits[1]
-        if limits[2] < x_avg: x_avg = limits[2]
-        if limits[3] < y_avg: y_avg = limits[3]
+        if x_avg < limits[0]:
+            x_avg = limits[0]
+        if y_avg < limits[1]:
+            y_avg = limits[1]
+        if limits[2] < x_avg:
+            x_avg = limits[2]
+        if limits[3] < y_avg:
+            y_avg = limits[3]
         return x_avg, y_avg
 
     while True:
         dets = node.io['dets'].get().detections
-        if len(dets) == 0: continue
+        if len(dets) == 0:
+            continue
 
-        coords = dets[0] # take first
+        coords = dets[0]  # take first
         # Get detection center
         x = (coords.xmin + coords.xmax) / 2 * ORIGINAL_SIZE[0]
         y = (coords.ymin + coords.ymax) / 2 * ORIGINAL_SIZE[1] + 100
 
-        x_avg, y_avg = average_filter(x,y)
+        x_avg, y_avg = average_filter(x, y)
 
         rect = RotatedRect()
         rect.size = size
         rect.center = Point2f(x_avg, y_avg)
         cfg.setCropRotatedRect(rect, False)
-        cfg.setFrameType(ImgFrame.Type.NV12) # MJPEG output for UVC consumption
+        # MJPEG output for UVC consumption
+        cfg.setFrameType(ImgFrame.Type.NV12)
         node.io['cfg'].send(cfg)
+
 
 # I am 100% sure this is a gross way to do it, but this does work!
 # inspect.getSource(onboardScripting) returns the text of the function, which we then split to remove the first 'def' line
 # The result is a list, which we join() to an empty string. To be honest I am not confident this is needed.
 # The result of the split has leading whitespace, which we remove with textwrap.dedent.
 # Finally, the string looks basically like a python file, and is ready to upload to the script node.
-processedOnBoardScriptString = textwrap.dedent("".join(inspect.getsource(onboardScripting).split("\n", 1)[1:]))
+processedOnBoardScriptString = textwrap.dedent(
+    "".join(inspect.getsource(onboardScripting).split("\n", 1)[1:]))
+
 
 def makeOnboardScript():
     # Script node for onboard cropping based on NN border
@@ -149,18 +173,20 @@ def makeOnboardScript():
     script.setScript(processedOnBoardScriptString)
     return script
 
+
 script = makeOnboardScript()
 crop_manip = pipeline.create(dai.node.ImageManip)
 crop_manip.setMaxOutputFrameSize(3110400)
-crop_manip.initialConfig.setResize(1920, 1080) # UVC wants a 1080P frame
-crop_manip.initialConfig.setFrameType(dai.RawImgFrame.Type.NV12) # MJPEG output for UVC consumption
+crop_manip.initialConfig.setResize(1920, 1080)  # UVC wants a 1080P frame
+crop_manip.initialConfig.setFrameType(
+    dai.RawImgFrame.Type.NV12)  # MJPEG output for UVC consumption
 
 script.outputs['cfg'].link(crop_manip.inputConfig)
 cam_rgb.isp.link(crop_manip.inputImage)
 
 # Create an UVC (USB Video Class) output node. It needs 1920x1080, NV12 input
 uvc = pipeline.create(dai.node.UVC)
-#videoEnc.bitstream.link(uvc.input)
+# videoEnc.bitstream.link(uvc.input)
 crop_manip.out.link(uvc.input)
 
 # Terminate app handler
