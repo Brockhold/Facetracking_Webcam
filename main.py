@@ -1,16 +1,32 @@
 #!/usr/bin/env python3
 
+"""
+Goal: using the 4k full-isp color camera, automatically crop a 1080P image and feed that to the host using UVC.
+- on the way, use a face tracking NN and center the crop on whichever face is detected first
+
+We need a couple different nodes:
+- cam_rgb is a dai.node.ColorCamera
+- mobilenet is a dai.node.MobileNetDetectionNetwork
+- crop_manip is an dai.node.ImageManip
+- script is a dai.node.Script
+- uvc is a dai.node.UVC
+
+The layout of these pipelines is like this:
+cam_rgb.preview[300,300] -> mobilenet -> script -> crop_manip
+cam_rgb -> crop_manip -> uvc
+"""
+
 try:
-    import platform
     import depthai as dai
-    import time
+    from depthai_sdk.managers import arg_manager
+    import blobconverter
     import inspect
+    import platform
     import textwrap
     import sys
     import signal
     import threading
-    from depthai_sdk.managers import arg_manager
-    import blobconverter
+    import time
 except ImportError as e:
     print(e, f"""
 did you remember to source (or create) a venv with the dependencies?
@@ -25,25 +41,6 @@ args = arg_manager.parseArgs()
 if platform.machine() == 'aarch64':
     print("This app is temporarily disabled on AARCH64 systems due to an issue with stream preview. We are working on resolving this issue", file=sys.stderr)
     raise SystemExit(1)
-
-"""
-Goal: using the 4k full-isp color camera, automatically crop a 1080P image and feed that to the host using UVC.
-- on the way, use a face tracking NN and center the crop on whichever face is detected
-
-
-We need a couple different nodes:
-- cam_rgb is a dai.node.ColorCamera
-- mobilenet is a dai.node.MobileNetDetectionNetwork
-- crop_manip is an dai.node.ImageManip
-- script is a dai.node.Script
-
-- uvc is a pipeline.createUVC() ... which is different syntax?
-
-The layout of these pipelines is like this:
-cam_rgb -> preview[300,300] -> mobilenet -> script -> crop_manip
-|-> crop_manip -> uvc
-
-"""
 
 # root pipeline definition
 pipeline = dai.Pipeline()
