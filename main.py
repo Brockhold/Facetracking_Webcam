@@ -121,7 +121,7 @@ def onboardScripting():
         rect.size = size
         rect.center = Point2f(x_avg, y_avg)  # type: ignore
         cfg.setCropRotatedRect(rect, False)
-        # MJPEG output for UVC consumption
+        # NV12 output for UVC consumption
         cfg.setFrameType(ImgFrame.Type.NV12)  # type: ignore
         node.io['cfg'].send(cfg)  # type: ignore
 
@@ -183,6 +183,8 @@ with dai.Device(pipeline, usb2Mode=False) as device:
                 temperature = device.getChipTemperature()
                 print(f'{currentTime}: temp {temperature.average}')
                 # one of the demos does this and throws an error if temperature is over 100 -- that seems too high, how about 80?
+                # the depthai API enforces thermal shutdown when the CPU is at 105 C, but the camera images get noisy before that.
+                # reference: https://docs.luxonis.com/projects/hardware/en/latest/pages/articles/lite_temp_test/#oak-d-lite-temperature-tests
                 if any(map(lambda field: getattr(temperature, field) > 80, ["average", "css", "dss", "mss", "upa"])):
                     raise RuntimeError("Over temp error!")
                 lastLogTime = currentTime
