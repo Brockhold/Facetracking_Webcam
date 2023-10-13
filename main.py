@@ -4,6 +4,8 @@ try:
     import platform
     import depthai as dai
     import time
+    import inspect
+    import textwrap
     import sys
     import signal
     import threading
@@ -66,11 +68,25 @@ mobilenet.setBlobPath(blobconverter.from_zoo(name="face-detection-retail-0004", 
 mobilenet.setConfidenceThreshold(0.7)
 cam_rgb.preview.link(mobilenet.input)
 
-def makeOnboardScript():
-    # Script node for onboard cropping based on NN border
-    script = pipeline.create(dai.node.Script)
-    mobilenet.out.link(script.inputs['dets'])
-    script.setScript(f"""
+# bogus definitions so that pylance shuts up
+def ImageManipConfig():
+    return 1
+def Size2f():
+    return 1
+class node:
+    def io():
+        return 1
+class ImgFrame:
+    def Type():
+        return 1
+def RotatedRect():
+    return 1
+def Point2f():
+    return 1
+
+# This code is never used by the host, it is uploaded to a script node on the device
+# Slight shennanigans are used to make this editable with all the nicities of a normal IDE, but it's uploaded as a raw string
+def onboardScripting():
     ORIGINAL_SIZE = (3840, 2160) # 4K
     SCENE_SIZE = (1920, 1080) # 1080P
     x_arr = []
@@ -118,7 +134,19 @@ def makeOnboardScript():
         cfg.setCropRotatedRect(rect, False)
         cfg.setFrameType(ImgFrame.Type.NV12) # MJPEG output for UVC consumption
         node.io['cfg'].send(cfg)
-    """)
+
+# I am 100% sure this is a gross way to do it, but this does work!
+# inspect.getSource(onboardScripting) returns the text of the function, which we then split to remove the first 'def' line
+# The result is a list, which we join() to an empty string. To be honest I am not confident this is needed.
+# The result of the split has leading whitespace, which we remove with textwrap.dedent.
+# Finally, the string looks basically like a python file, and is ready to upload to the script node.
+processedOnBoardScriptString = textwrap.dedent("".join(inspect.getsource(onboardScripting).split("\n", 1)[1:]))
+
+def makeOnboardScript():
+    # Script node for onboard cropping based on NN border
+    script = pipeline.create(dai.node.Script)
+    mobilenet.out.link(script.inputs['dets'])
+    script.setScript(processedOnBoardScriptString)
     return script
 
 script = makeOnboardScript()
