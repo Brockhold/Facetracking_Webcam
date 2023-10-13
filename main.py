@@ -208,7 +208,11 @@ with dai.Device(pipeline, usb2Mode=False) as device:
         try:
             currentTime = time.monotonic_ns()
             if (currentTime - lastLogTime > 10000000000):
-                print(f'{currentTime}: temp {device.getChipTemperature().average}')
+                temperature = device.getChipTemperature()
+                print(f'{currentTime}: temp {temperature.average}')
+                # one of the demos does this and throws an error if temperature is over 100 -- that seems too high, how about 80?
+                if any(map(lambda field: getattr(temperature, field) > 80, ["average", "css", "dss", "mss", "upa"])):
+                    raise RuntimeError("Over temp error!")
                 lastLogTime = currentTime
             time.sleep(0.1)
         except KeyboardInterrupt:
