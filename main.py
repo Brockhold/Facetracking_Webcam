@@ -204,9 +204,15 @@ with dai.Device(pipeline, usb2Mode=False) as device:
     print("    guvcview -d /dev/video0")
     print("\nTo close: Ctrl+C")
 
-    # Doing nothing here, just keeping the host feeding the watchdog
+    # Periodically log useful stats, but otherwise do nothing. Sleeping too long fails to pet a watchdog
+    # TODO: determine if getting stats interrupts anything
+    lastLogTime = time.monotonic_ns()
     while not quitEvent.is_set():
         try:
+            currentTime = time.monotonic_ns()
+            if (currentTime - lastLogTime > 10000000000):
+                print(f'{currentTime}: temp {device.getChipTemperature().average}')
+                lastLogTime = currentTime
             time.sleep(0.1)
         except KeyboardInterrupt:
             break
