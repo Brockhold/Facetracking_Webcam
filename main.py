@@ -161,7 +161,7 @@ crop_manip = pipeline.create(dai.node.ImageManip)
 crop_manip.setMaxOutputFrameSize(3110400)
 crop_manip.initialConfig.setResize(1920, 1080)  # UVC wants a 1080P frame
 crop_manip.initialConfig.setFrameType(
-    dai.RawImgFrame.Type.NV12)  # MJPEG output for UVC consumption
+    dai.RawImgFrame.Type.NV12)  # NV12 output for UVC consumption
 
 script.outputs['cfg'].link(crop_manip.inputConfig)
 cam_rgb.isp.link(crop_manip.inputImage)
@@ -175,12 +175,13 @@ crop_manip.out.link(uvc.input)
 quitEvent = threading.Event()
 signal.signal(signal.SIGTERM, lambda *_args: quitEvent.set())
 
-# Pipeline defined, now the device is connected to
+# Pipeline defined, get the device - but not in USB2 mode, because that has issuse with UVC.
 with dai.Device(pipeline, usb2Mode=False) as device:
     if device.getDeviceInfo().protocol == dai.XLinkProtocol.X_LINK_USB_VSC and device.getUsbSpeed() not in (dai.UsbSpeed.SUPER, dai.UsbSpeed.SUPER_PLUS):
         print("Sorry, USB2 link speed not working, see default depthai UVC app", file=sys.stderr)
         raise SystemExit(1)
 
+    # we want to suppress the excessive number "[error] Still capture ignored, as the output is not connected"
     device.setLogLevel(dai.LogLevel.WARN)
     device.setLogOutputLevel(dai.LogLevel.WARN)
 
