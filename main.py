@@ -18,7 +18,6 @@ cam_rgb -> crop_manip -> uvc
 
 try:
     import depthai as dai
-    from depthai_sdk.managers import arg_manager
     import blobconverter
     import inspect
     import platform
@@ -34,12 +33,6 @@ e.g.
 source depthai_venv/bin/activate.fish
 pip3 install -r requirements.txt
 """)
-    raise SystemExit(1)
-
-args = arg_manager.parseArgs()
-
-if platform.machine() == 'aarch64':
-    print("This app is temporarily disabled on AARCH64 systems due to an issue with stream preview. We are working on resolving this issue", file=sys.stderr)
     raise SystemExit(1)
 
 # root pipeline definition
