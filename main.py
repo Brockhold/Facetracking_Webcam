@@ -49,6 +49,8 @@ pipeline = dai.Pipeline()
 cam_rgb = pipeline.create(dai.node.ColorCamera)
 cam_rgb.setBoardSocket(dai.CameraBoardSocket.RGB)
 cam_rgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_4_K)
+# highly cinematic! Maximum at 4k seems to be "28.86" which is a weird number but OK
+cam_rgb.setFps(24)
 cam_rgb.setIspScale(1, 2)
 
 # set the preview to squash the full frame down to 300x300 for the mobilenet input
@@ -68,20 +70,34 @@ cam_rgb.preview.link(mobilenet.input)
 def onboardScripting():
     # This code is never used by the host, it is uploaded to a script node on the device
     # Slight shennanigans are used to make this editable with all the nicities of a normal IDE, but it's uploaded as a raw string
-    ORIGINAL_SIZE = (3840, 2160)  # 4K
-    SCENE_SIZE = (1920, 1080)  # 1080P
+    ISP_SIZE = (3840, 2160)  # 4K
+    # NN_SIZE = (300, 300) # mobilenet input is performed on a 300x300 preview frame
+    OUTPUT_SIZE = (1920, 1080)  # 1080P
+
+    # The maximum and minimum values prevent the center of the output from overlapping the output rectangle with the input
+    xMin = OUTPUT_SIZE[0]//2
+    xMax = ISP_SIZE[0] - OUTPUT_SIZE[0]
+    yMin = OUTPUT_SIZE[1]//2
+    yMax = ISP_SIZE[1] - OUTPUT_SIZE[1]
+
+    size = Size2f(OUTPUT_SIZE[0], OUTPUT_SIZE[1])  # type: ignore
+    cfg = ImageManipConfig()  # type: ignore
+
+    # values seen, used for debugging, TODO remove
+    minX = ISP_SIZE[0]
+    maxX = 0
+    minY = ISP_SIZE[1]
+    maxY = 0
+
+    def clamp(minv, maxv, inputv):
+        return max(min(maxv, inputv), minv)
 
     x_arr = []
     y_arr = []
     AVG_MAX_NUM = 7
-    limits = [SCENE_SIZE[0] // 2, SCENE_SIZE[1] // 2]  # xmin and ymin limits
-    limits.append(ORIGINAL_SIZE[0] - limits[0])  # xmax limit
-    limits.append(ORIGINAL_SIZE[1] - limits[1])  # ymax limit
-
-    cfg = ImageManipConfig()  # type: ignore
-    size = Size2f(SCENE_SIZE[0], SCENE_SIZE[1])  # type: ignore
 
     def average_filter(x, y):
+        # we keep a running average of values for x and y to reduce jittering
         x_arr.append(x)
         y_arr.append(y)
         if AVG_MAX_NUM < len(x_arr):
@@ -95,14 +111,7 @@ def onboardScripting():
             y_avg += y_arr[i]
         x_avg = x_avg / len(x_arr)
         y_avg = y_avg / len(y_arr)
-        if x_avg < limits[0]:
-            x_avg = limits[0]
-        if y_avg < limits[1]:
-            y_avg = limits[1]
-        if limits[2] < x_avg:
-            x_avg = limits[2]
-        if limits[3] < y_avg:
-            y_avg = limits[3]
+        # kinda wish there was a builtin for this sort of operation
         return x_avg, y_avg
 
     while True:
@@ -111,9 +120,20 @@ def onboardScripting():
             continue
 
         coords = dets[0]  # take first
-        # Get detection center
-        x = (coords.xmin + coords.xmax) / 2 * ORIGINAL_SIZE[0]
-        y = (coords.ymin + coords.ymax) / 2 * ORIGINAL_SIZE[1] + 100
+        # Get detection center, coords values are normalized to (0,1)
+        x = (coords.xmin + coords.xmax) / 2 * ISP_SIZE[0]
+        y = (coords.ymin + coords.ymax) / 2 * ISP_SIZE[1]
+
+        # we limit the input range to keep the crop view inside the original frame size
+        x = clamp(xMin, xMax, x)
+        y = clamp(yMin, yMax, y)
+
+        # this stuff is for debugging
+        # maxX = max(maxX, x)
+        # minX = min(minX, x)
+        # maxY = max(maxY, y)
+        # minY = min(minY, y)
+        # node.warn(f"coords minX:{minX} minY:{minY} maxX:{maxX} maxY:{maxY}")
 
         x_avg, y_avg = average_filter(x, y)
 
@@ -167,6 +187,9 @@ with dai.Device(pipeline, usb2Mode=False) as device:
     if device.getDeviceInfo().protocol == dai.XLinkProtocol.X_LINK_USB_VSC and device.getUsbSpeed() not in (dai.UsbSpeed.SUPER, dai.UsbSpeed.SUPER_PLUS):
         print("Sorry, USB2 link speed not working, see default depthai UVC app", file=sys.stderr)
         raise SystemExit(1)
+
+    device.setLogLevel(dai.LogLevel.WARN)
+    device.setLogOutputLevel(dai.LogLevel.WARN)
 
     print("\nDevice started, please keep this process running")
     print("and open an UVC viewer. Example on Linux:")
