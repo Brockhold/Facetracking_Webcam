@@ -12,8 +12,10 @@ We need a couple different nodes:
 - uvc is a dai.node.UVC
 
 The layout of these pipelines is like this:
-cam_rgb.preview[300,300] -> mobilenet -> script -> crop_manip
+cam_rgb.preview[300,300] -> mobilenet -> script -> crop_manip configuration
 cam_rgb -> crop_manip -> uvc
+
+For reducing jitter a bit, the values coming from the face detection NN will be running-averaged.
 """
 
 try:
@@ -42,9 +44,9 @@ pipeline = dai.Pipeline()
 cam_rgb = pipeline.create(dai.node.ColorCamera)
 cam_rgb.setBoardSocket(dai.CameraBoardSocket.RGB)
 cam_rgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_4_K)
-# highly cinematic! Maximum at 4k seems to be "28.86" which is a weird number but OK
+# highly cinematic! Maximum framerate at 4k seems to be "28.86" which is a weird number but OK
 cam_rgb.setFps(24)
-cam_rgb.initialControl.setManualFocus(130)
+#cam_rgb.initialControl.setManualFocus(130)
 cam_rgb.setInterleaved(False)
 
 # set the preview to squash the full frame down to 300x300 for the mobilenet input
@@ -70,9 +72,8 @@ def onboardScripting():
     xMax = ISP_SIZE[0] - OUTPUT_SIZE[0]/2
     yMin = OUTPUT_SIZE[1]//2
     yMax = ISP_SIZE[1] - OUTPUT_SIZE[1]/2
-
-    output_size = Size2f(OUTPUT_SIZE[0], OUTPUT_SIZE[1])  # type: ignore
-    cfg = ImageManipConfig()  # type: ignore
+    output_size = Size2f(OUTPUT_SIZE[0], OUTPUT_SIZE[1])
+    cfg = ImageManipConfig()
 
     def clamp(minv, maxv, inputv):
         return max(min(maxv, inputv), minv)
@@ -100,29 +101,32 @@ def onboardScripting():
         return x_avg, y_avg
 
     while True:
-        dets = node.io['dets'].get().detections  # type: ignore
+        x = 0
+        y = 0
+        dets = node.io['dets'].get().detections
         if len(dets) == 0:
-            continue
-
-        coords = dets[0]  # take first
-        # Get detection center, coords values are normalized to (0,1)
-        x = int((coords.xmin + coords.xmax) / 2 * ISP_SIZE[0])
-        y = int((coords.ymin + coords.ymax) / 2 * ISP_SIZE[1])
+            x = ISP_SIZE[0]/2
+            y - ISP_SIZE[1]/2
+        else:
+            coords = dets[0]
+            # Get detection center, coords values are normalized to (0,1)
+            x = int((coords.xmin + coords.xmax) / 2 * ISP_SIZE[0])
+            y = int((coords.ymin + coords.ymax) / 2 * ISP_SIZE[1])
 
         # we limit the input range to keep the crop view inside the original frame size
-        x_clamped = clamp(xMin, xMax, x)# - OUTPUT_SIZE[0]/2 # WHY DOES THIS WORK TODO: UNDERSTAND
-        y_clamped = clamp(yMin, yMax, y)# - OUTPUT_SIZE[1]/2
+        x_clamped = clamp(xMin, xMax, x)
+        y_clamped = clamp(yMin, yMax, y)
         x_avg, y_avg = average_filter(x_clamped, y_clamped)
 
-        node.warn(f"coords x:{x} y:{y} AVERAGE x:{x_avg} y:{y_avg}")
+        # node.warn(f"coords x:{x} y:{y} AVERAGE x:{x_avg} y:{y_avg}")
 
-        crop_rect = RotatedRect()  # type: ignore
+        crop_rect = RotatedRect()
         crop_rect.size = output_size
-        crop_rect.center = Point2f(x_avg, y_avg)  # type: ignore
+        crop_rect.center = Point2f(x_avg, y_avg)
         cfg.setCropRotatedRect(crop_rect, False)
         # NV12 output for UVC consumption
-        cfg.setFrameType(ImgFrame.Type.NV12)  # type: ignore
-        node.io['cfg'].send(cfg)  # type: ignore
+        cfg.setFrameType(ImgFrame.Type.NV12)
+        node.io['cfg'].send(cfg)
 
 
 # I am 100% sure this is a gross way to do it, but this does work!
@@ -145,7 +149,7 @@ def makeOnboardScript():
 script = makeOnboardScript()
 crop_manip = pipeline.create(dai.node.ImageManip)
 crop_manip.setMaxOutputFrameSize(3110400)
-#crop_manip.initialConfig.setHorizontalFlip(False)
+# crop_manip.initialConfig.setHorizontalFlip(False)
 crop_manip.initialConfig.setResize(1920, 1080)  # UVC wants a 1080P frame
 crop_manip.initialConfig.setFrameType(
     dai.RawImgFrame.Type.NV12)  # NV12 output for UVC consumption
@@ -155,7 +159,6 @@ cam_rgb.isp.link(crop_manip.inputImage)
 
 # Create an UVC (USB Video Class) output node. It needs 1920x1080, NV12 input
 uvc = pipeline.create(dai.node.UVC)
-# videoEnc.bitstream.link(uvc.input)
 crop_manip.out.link(uvc.input)
 
 # Terminate app handler
