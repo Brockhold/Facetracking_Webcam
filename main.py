@@ -64,16 +64,15 @@ def onboardScripting():
     # This code is never used by the host, it is uploaded to a script node on the device
     # Slight shennanigans are used to make this editable with all the nicities of a normal IDE, but it's uploaded as a raw string
     ISP_SIZE = (3840, 2160)  # 4K
-    # NN_SIZE = (300, 300) # mobilenet input is performed on a 300x300 preview frame
     OUTPUT_SIZE = (1920, 1080)  # 1080P
 
-    # The maximum and minimum values prevent the center of the output from overlapping the output rectangle with the input
+    # The maximum and minimum center values prevent the output rectangle from overlapping the input rectangle
     xMin = OUTPUT_SIZE[0]//2
-    xMax = ISP_SIZE[0] - OUTPUT_SIZE[0]
+    xMax = ISP_SIZE[0] - OUTPUT_SIZE[0]/2
     yMin = OUTPUT_SIZE[1]//2
-    yMax = ISP_SIZE[1] - OUTPUT_SIZE[1]
+    yMax = ISP_SIZE[1] - OUTPUT_SIZE[1]/2
 
-    size = Size2f(OUTPUT_SIZE[0], OUTPUT_SIZE[1])  # type: ignore
+    output_size = Size2f(OUTPUT_SIZE[0], OUTPUT_SIZE[1])  # type: ignore
     cfg = ImageManipConfig()  # type: ignore
 
     # values seen, used for debugging, TODO remove
@@ -102,8 +101,8 @@ def onboardScripting():
         for i in range(len(x_arr)):
             x_avg += x_arr[i]
             y_avg += y_arr[i]
-        x_avg = x_avg / len(x_arr)
-        y_avg = y_avg / len(y_arr)
+        x_avg = int(x_avg / len(x_arr))
+        y_avg = int(y_avg / len(y_arr))
         # kinda wish there was a builtin for this sort of operation
         return x_avg, y_avg
 
@@ -114,26 +113,20 @@ def onboardScripting():
 
         coords = dets[0]  # take first
         # Get detection center, coords values are normalized to (0,1)
-        x = (coords.xmin + coords.xmax) / 2 * ISP_SIZE[0]
-        y = (coords.ymin + coords.ymax) / 2 * ISP_SIZE[1]
+        x = int((coords.xmin + coords.xmax) / 2 * ISP_SIZE[0])
+        y = int((coords.ymin + coords.ymax) / 2 * ISP_SIZE[1])
 
         # we limit the input range to keep the crop view inside the original frame size
-        x = clamp(xMin, xMax, x)
-        y = clamp(yMin, yMax, y)
+        x_clamped = clamp(xMin, xMax, x)
+        y_clamped = clamp(yMin, yMax, y)
+        x_avg, y_avg = average_filter(x_clamped, y_clamped)
 
-        # this stuff is for debugging
-        # maxX = max(maxX, x)
-        # minX = min(minX, x)
-        # maxY = max(maxY, y)
-        # minY = min(minY, y)
-        # node.warn(f"coords minX:{minX} minY:{minY} maxX:{maxX} maxY:{maxY}")
+        node.warn(f"coords x:{x} y:{y} AVERAGE x:{x_avg} y:{y_avg}")
 
-        x_avg, y_avg = average_filter(x, y)
-
-        rect = RotatedRect()  # type: ignore
-        rect.size = size
-        rect.center = Point2f(x_avg, y_avg)  # type: ignore
-        cfg.setCropRotatedRect(rect, False)
+        crop_rect = RotatedRect()  # type: ignore
+        crop_rect.size = output_size
+        crop_rect.center = Point2f(x_avg, y_avg)  # type: ignore
+        cfg.setCropRotatedRect(crop_rect, False)
         # NV12 output for UVC consumption
         cfg.setFrameType(ImgFrame.Type.NV12)  # type: ignore
         node.io['cfg'].send(cfg)  # type: ignore
