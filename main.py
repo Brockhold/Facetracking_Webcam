@@ -45,12 +45,12 @@ cam_rgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_4_K)
 # highly cinematic! Maximum at 4k seems to be "28.86" which is a weird number but OK
 cam_rgb.setFps(24)
 cam_rgb.setIspScale(1, 2)
+cam_rgb.initialControl.setManualFocus(130)
+cam_rgb.setInterleaved(False)
 
 # set the preview to squash the full frame down to 300x300 for the mobilenet input
 cam_rgb.setPreviewKeepAspectRatio(False)
 cam_rgb.setPreviewSize(300, 300)
-cam_rgb.initialControl.setManualFocus(130)
-cam_rgb.setInterleaved(False)
 
 # Create MobileNet detection network
 mobilenet = pipeline.create(dai.node.MobileNetDetectionNetwork)
@@ -74,12 +74,6 @@ def onboardScripting():
 
     output_size = Size2f(OUTPUT_SIZE[0], OUTPUT_SIZE[1])  # type: ignore
     cfg = ImageManipConfig()  # type: ignore
-
-    # values seen, used for debugging, TODO remove
-    minX = ISP_SIZE[0]
-    maxX = 0
-    minY = ISP_SIZE[1]
-    maxY = 0
 
     def clamp(minv, maxv, inputv):
         return max(min(maxv, inputv), minv)
@@ -152,6 +146,7 @@ def makeOnboardScript():
 script = makeOnboardScript()
 crop_manip = pipeline.create(dai.node.ImageManip)
 crop_manip.setMaxOutputFrameSize(3110400)
+#crop_manip.initialConfig.setHorizontalFlip(False)
 crop_manip.initialConfig.setResize(1920, 1080)  # UVC wants a 1080P frame
 crop_manip.initialConfig.setFrameType(
     dai.RawImgFrame.Type.NV12)  # NV12 output for UVC consumption
