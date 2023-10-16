@@ -44,7 +44,6 @@ cam_rgb.setBoardSocket(dai.CameraBoardSocket.RGB)
 cam_rgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_4_K)
 # highly cinematic! Maximum at 4k seems to be "28.86" which is a weird number but OK
 cam_rgb.setFps(24)
-cam_rgb.setIspScale(1, 2)
 cam_rgb.initialControl.setManualFocus(130)
 cam_rgb.setInterleaved(False)
 
@@ -111,8 +110,8 @@ def onboardScripting():
         y = int((coords.ymin + coords.ymax) / 2 * ISP_SIZE[1])
 
         # we limit the input range to keep the crop view inside the original frame size
-        x_clamped = clamp(xMin, xMax, x)
-        y_clamped = clamp(yMin, yMax, y)
+        x_clamped = clamp(xMin, xMax, x)# - OUTPUT_SIZE[0]/2 # WHY DOES THIS WORK TODO: UNDERSTAND
+        y_clamped = clamp(yMin, yMax, y)# - OUTPUT_SIZE[1]/2
         x_avg, y_avg = average_filter(x_clamped, y_clamped)
 
         node.warn(f"coords x:{x} y:{y} AVERAGE x:{x_avg} y:{y_avg}")
