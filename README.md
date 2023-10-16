@@ -25,5 +25,5 @@ The layout of these pipelines is like this:
 
 ```
 References:
-[UVC Node demo app](https://github.com/luxonis/depthai/tree/main/apps/uvc)
-[gen2-lossless-zooming demo](https://github.com/luxonis/depthai-experiments/tree/master/gen2-lossless-zooming)
+* [UVC Node demo app](https://github.com/luxonis/depthai/tree/main/apps/uvc)
+* [gen2-lossless-zooming demo](https://github.com/luxonis/depthai-experiments/tree/master/gen2-lossless-zooming)
