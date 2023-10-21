@@ -108,10 +108,17 @@ def onboardScripting():
             x = ISP_SIZE[0]/2
             y - ISP_SIZE[1]/2
         else:
-            coords = dets[0]
+            # at least one face was detected, so let's center a frame on it/them
+            # we find the bounding box that captures as many faces as our NN returns
+            detection_bounds = {"xMin":1, "xMax": 0, "yMin":1, "yMax":0}
+            for face in dets:
+                detection_bounds["xMin"] = min(detection_bounds["xMin"], face.xmin)
+                detection_bounds["xMax"] = max(detection_bounds["xMax"], face.xmax)
+                detection_bounds["yMin"] = min(detection_bounds["yMin"], face.ymin)
+                detection_bounds["yMax"] = max(detection_bounds["yMax"], face.ymax)
             # Get detection center, coords values are normalized to (0,1)
-            x = int((coords.xmin + coords.xmax) / 2 * ISP_SIZE[0])
-            y = int((coords.ymin + coords.ymax) / 2 * ISP_SIZE[1])
+            x = int((detection_bounds["xMin"] + detection_bounds["xMax"]) / 2 * ISP_SIZE[0])
+            y = int((detection_bounds["yMin"] + detection_bounds["yMax"]) / 2 * ISP_SIZE[1])
 
         # we limit the input range to keep the crop view inside the original frame size
         x_clamped = clamp(xMin, xMax, x)
