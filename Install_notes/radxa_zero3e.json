@@ -19,7 +19,8 @@
                 "cmake -DRKPLATFORM=ON -DHAVE_DRM=ON && make -j$(nproc)",
                 "sudo make install",
                 "sudo cp ./mpp/librockchip_mpp.so* /lib/aarch64-linux-gnu",
-                "sudo cp ./mpp/legacy/librockchip_vpu.so* /lib/aarch64-linux-gnu""popd"
+                "sudo cp ./mpp/legacy/librockchip_vpu.so* /lib/aarch64-linux-gnu",
+                "popd"
             ]
         },
         "ffmpeg": {
