@@ -1,0 +1,9 @@
+sudo ./ffmpeg-rockchip/ffmpeg -hwaccel rkmpp -hwaccel_output_format drm_prime -input_format nv12 \
+-i /dev/video0 \
+-c:v h264_rkmpp -b:v 6M -maxrate 6M -g:v 250 -c:a copy -sn -dn \
+-f rtsp rtsp://0.0.0.0:8554/stream
+
+
+
+sudo ./ffmpeg-rockchip/ffmpeg -re -f v4l2 -input_format nv12 -i /dev/video0 -c:v h264_rkmpp -f rtsp rtsp://0.0.0.0:8554/stream
+
